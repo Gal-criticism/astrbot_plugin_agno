@@ -2,23 +2,97 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
+AGNO_BASE_URL = "http://192.168.254.193:8001"
+
+
+@register("agno", "AGNO-AGENTOS集成", "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件", "1.0.0")
+class AgnoPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+        self.client = None
 
     async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+        from agno.client import AgentOSClient
+        self.client = AgentOSClient(base_url=AGNO_BASE_URL)
+        try:
+            config = await self.client.aget_config()
+            logger.info(f"Connected to AgentOS: {config.name or config.os_id}")
+            for agent in config.agents:
+                logger.info(f"Loaded agent: {agent.id} ({agent.name})")
+        except Exception as e:
+            logger.error(f"Failed to connect to AgentOS: {e}")
 
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+    @filter.command("gal.resources")
+    async def gal_resources(self, event: AstrMessageEvent):
+        """列出所有可用的agents、teams、workflows"""
+        if not self.client:
+            yield event.plain_result("未连接到AgentOS服务")
+            return
+
+        try:
+            config = await self.client.aget_config()
+            msg = []
+
+            if config.agents:
+                msg.append("Agents:")
+                for a in config.agents:
+                    msg.append(f"  - {a.id} ({a.name})")
+            else:
+                msg.append("无可用Agents")
+
+            if config.teams:
+                msg.append("\nTeams:")
+                for t in config.teams:
+                    msg.append(f"  - {t.id} ({t.name})")
+            else:
+                msg.append("\n无可用Teams")
+
+            if config.workflows:
+                msg.append("\nWorkflows:")
+                for w in config.workflows:
+                    msg.append(f"  - {w.id} ({w.name})")
+            else:
+                msg.append("\n无可用Workflows")
+
+            yield event.plain_result("\n".join(msg))
+        except Exception as e:
+            yield event.plain_result(f"获取失败: {e}")
+
+    @filter.command("gal.game")
+    async def gal_game(self, event: AstrMessageEvent):
+        """游戏Agent: /gal game <问题>"""
+        if not self.client:
+            yield event.plain_result("未连接到AgentOS服务")
+            return
+
+        msg = event.message_str.strip()
+        if not msg:
+            yield event.plain_result("用法: /gal game <问题>")
+            return
+
+        try:
+            result = await self.client.run_agent(agent_id="knowledge-game-agent", message=msg)
+            yield event.plain_result(result.content if result.content else "无响应")
+        except Exception as e:
+            yield event.plain_result(f"执行失败: {e}")
+
+    @filter.command("gal.news")
+    async def gal_news(self, event: AstrMessageEvent):
+        """新闻Agent: /gal news <问题>"""
+        if not self.client:
+            yield event.plain_result("未连接到AgentOS服务")
+            return
+
+        msg = event.message_str.strip()
+        if not msg:
+            yield event.plain_result("用法: /gal news <问题>")
+            return
+
+        try:
+            result = await self.client.run_agent(agent_id="knowledge-news-agent", message=msg)
+            yield event.plain_result(result.content if result.content else "无响应")
+        except Exception as e:
+            yield event.plain_result(f"执行失败: {e}")
 
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        pass

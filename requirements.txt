@@ -1,0 +1,2 @@
+agno>=2.4.8
+fastapi[standard]
