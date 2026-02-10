@@ -319,6 +319,7 @@ dependencies = [
     { name = "agno" },
     { name = "astrbot" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "httpx" },
 ]
 
 [package.optional-dependencies]
@@ -332,6 +333,7 @@ requires-dist = [
     { name = "agno", specifier = ">=2.4.8" },
     { name = "astrbot", specifier = ">=4.14.8" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.128.5" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
 ]

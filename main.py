@@ -9,11 +9,23 @@ class AgnoPlugin(Star):
         super().__init__(context)
         self.config = config
         self.client = None
+        self.base_url = None
 
     async def initialize(self):
         from agno.client import AgentOSClient
-        base_url = self.config.get("agentos_base_url", "http://192.168.254.193:8001")
-        self.client = AgentOSClient(base_url=base_url)
+        import httpx
+        self.base_url = self.config.get("agentos_base_url", "http://192.168.254.193:8001")
+        logger.info(f"Connecting to AgentOS: {self.base_url}")
+
+        # 测试网络连接
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"{self.base_url}/health", follow_redirects=True)
+                logger.info(f"AgentOS health check: {resp.status_code}")
+        except Exception as e:
+            logger.warning(f"AgentOS health check failed: {e}")
+
+        self.client = AgentOSClient(base_url=self.base_url, timeout=60.0)
         try:
             config = await self.client.aget_config()
             logger.info(f"Connected to AgentOS: {config.name or config.os_id}")
@@ -61,6 +73,7 @@ class AgnoPlugin(Star):
 
             yield event.plain_result("\n".join(msg))
         except Exception as e:
+            logger.exception("gal_resources error")
             yield event.plain_result(f"获取失败: {e}")
 
     @gal.command("game")
@@ -97,7 +110,24 @@ class AgnoPlugin(Star):
             result = await self.client.run_agent(agent_id="knowledge-news-agent", message=msg)
             yield event.plain_result(result.content if result.content else "无响应")
         except Exception as e:
+            logger.exception("gal_news error")
             yield event.plain_result(f"执行失败: {e}")
+
+    @gal.command("test")
+    async def gal_test(self, event: AstrMessageEvent):
+        """测试AgentOS连接"""
+        import httpx
+        if not self.base_url:
+            yield event.plain_result("未配置AgentOS地址")
+            return
+
+        try:
+            yield event.plain_result(f"测试连接: {self.base_url}")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f"{self.base_url}/health", follow_redirects=True)
+                yield event.plain_result(f"Health check: {resp.status_code}\n{resp.text}")
+        except Exception as e:
+            yield event.plain_result(f"连接失败: {e}")
 
     async def terminate(self):
         pass
