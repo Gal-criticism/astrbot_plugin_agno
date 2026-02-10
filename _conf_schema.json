@@ -1,0 +1,7 @@
+{
+  "agentos_base_url": {
+    "description": "AgentOS 服务地址",
+    "type": "string",
+    "default": "http://192.168.254.193:8001"
+  }
+}

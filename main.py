@@ -1,19 +1,19 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
-
-AGNO_BASE_URL = "http://192.168.254.193:8001"
+from astrbot.api import logger, AstrBotConfig
 
 
 @register("agno", "AGNO-AGENTOS集成", "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件", "1.0.0")
 class AgnoPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
         self.client = None
 
     async def initialize(self):
         from agno.client import AgentOSClient
-        self.client = AgentOSClient(base_url=AGNO_BASE_URL)
+        base_url = self.config.get("agentos_base_url", "http://192.168.254.193:8001")
+        self.client = AgentOSClient(base_url=base_url)
         try:
             config = await self.client.aget_config()
             logger.info(f"Connected to AgentOS: {config.name or config.os_id}")
@@ -22,7 +22,12 @@ class AgnoPlugin(Star):
         except Exception as e:
             logger.error(f"Failed to connect to AgentOS: {e}")
 
-    @filter.command("gal.resources")
+    @filter.command_group("gal")
+    def gal(self):
+        """AGNO AgentOS 指令组"""
+        pass
+
+    @gal.command("resources")
     async def gal_resources(self, event: AstrMessageEvent):
         """列出所有可用的agents、teams、workflows"""
         if not self.client:
@@ -58,7 +63,7 @@ class AgnoPlugin(Star):
         except Exception as e:
             yield event.plain_result(f"获取失败: {e}")
 
-    @filter.command("gal.game")
+    @gal.command("game")
     async def gal_game(self, event: AstrMessageEvent):
         """游戏Agent: /gal game <问题>"""
         if not self.client:
@@ -76,7 +81,7 @@ class AgnoPlugin(Star):
         except Exception as e:
             yield event.plain_result(f"执行失败: {e}")
 
-    @filter.command("gal.news")
+    @gal.command("news")
     async def gal_news(self, event: AstrMessageEvent):
         """新闻Agent: /gal news <问题>"""
         if not self.client:
