@@ -25,7 +25,7 @@ class AgnoPlugin(Star):
         except Exception as e:
             logger.warning(f"AgentOS health check failed: {e}")
 
-        self.client = AgentOSClient(base_url=self.base_url, timeout=60.0)
+        self.client = AgentOSClient(base_url=self.base_url, timeout=300)
         try:
             config = await self.client.aget_config()
             logger.info(f"Connected to AgentOS: {config.name or config.os_id}")
