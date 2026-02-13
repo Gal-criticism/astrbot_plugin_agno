@@ -89,6 +89,7 @@ class AgnoPlugin(Star):
             return
 
         try:
+            yield event.plain_result(" ")
             result = await self.client.run_agent(agent_id="knowledge-game-agent", message=msg)
             yield event.plain_result(result.content if result.content else "无响应")
         except Exception as e:
@@ -107,6 +108,7 @@ class AgnoPlugin(Star):
             return
 
         try:
+            yield event.plain_result(" ")
             result = await self.client.run_agent(agent_id="knowledge-news-agent", message=msg)
             yield event.plain_result(result.content if result.content else "无响应")
         except Exception as e:
