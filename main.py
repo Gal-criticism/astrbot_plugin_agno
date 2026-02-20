@@ -129,7 +129,7 @@ class AgnoPlugin(Star):
 
         try:
             yield event.plain_result(" ")
-            result = await self.client.run_agent(agent_id="github_agent", message=msg)
+            result = await self.client.run_agent(agent_id="github-agent", message=msg)
             yield event.plain_result(result.content if result.content else "无响应")
         except Exception as e:
             logger.exception("gal_gh error")

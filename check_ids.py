@@ -4,7 +4,7 @@
 import asyncio
 from agno.client import AgentOSClient
 
-AGNO_BASE_URL = "http://192.168.254.193:8001"
+AGNO_BASE_URL = "http://192.168.254.225:8001"
 
 
 async def main():
