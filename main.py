@@ -115,6 +115,26 @@ class AgnoPlugin(Star):
             logger.exception("gal_news error")
             yield event.plain_result(f"执行失败: {e}")
 
+    @gal.command("gh")
+    async def gal_gh(self, event: AstrMessageEvent):
+        """GitHub Agent: /gh <问题>"""
+        if not self.client:
+            yield event.plain_result("未连接到AgentOS服务")
+            return
+
+        msg = event.message_str.strip()
+        if not msg:
+            yield event.plain_result("用法: /gh <问题>")
+            return
+
+        try:
+            yield event.plain_result(" ")
+            result = await self.client.run_agent(agent_id="github_agent", message=msg)
+            yield event.plain_result(result.content if result.content else "无响应")
+        except Exception as e:
+            logger.exception("gal_gh error")
+            yield event.plain_result(f"执行失败: {e}")
+
     @gal.command("test")
     async def gal_test(self, event: AstrMessageEvent):
         """测试AgentOS连接"""
