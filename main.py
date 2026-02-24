@@ -1,7 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
-from renderer import MarkdownRenderer
+from .renderer import MarkdownRenderer
 
 
 @register("agno", "AGNO-AGENTOS集成", "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件", "1.0.0")
