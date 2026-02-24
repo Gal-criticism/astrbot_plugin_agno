@@ -11,7 +11,7 @@
   },
   "render_threshold": {
     "description": "超过此长度使用图片渲染(字符数)，0 表示始终使用图片",
-    "type": "integer",
+    "type": "int",
     "default": 200
   }
 }
