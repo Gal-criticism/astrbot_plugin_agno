@@ -85,11 +85,9 @@ class MarkdownRenderer:
         return url
 
     async def _render_local(self, markdown_content: str, title: str) -> str:
-        """使用本地库渲染 (markdown2 + weasyprint + Pillow)"""
-        import io
+        """使用本地库渲染 (markdown2 + weasyprint)"""
         import base64
         from weasyprint import HTML
-        from PIL import Image
         
         # 转换为 HTML
         html_body = self._markdown_to_html(markdown_content)
@@ -100,14 +98,8 @@ class MarkdownRenderer:
         # 渲染为 PDF
         pdf_bytes = HTML(string=full_html).write_pdf()
         
-        # PDF 转 PNG
-        img = Image.open(io.BytesIO(pdf_bytes))
-        img = img.convert("RGB")
-        
         # 转换为 base64
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return f"base64://{base64.b64encode(buf.getvalue()).decode()}"
+        return f"base64://{base64.b64encode(pdf_bytes).decode()}"
 
     def _markdown_to_html(self, markdown: str) -> str:
         """将 markdown 转换为简单 HTML"""
