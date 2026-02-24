@@ -28,6 +28,7 @@ class MarkdownRenderer:
         self.template_dir = self.resources_dir / "template"
         self.render_mode = render_mode
         self.render_threshold = render_threshold
+        self._temp_pdf_path: Optional[Path] = None
 
     async def initialize(self):
         """初始化渲染器"""
@@ -86,8 +87,16 @@ class MarkdownRenderer:
 
     async def _render_local(self, markdown_content: str, title: str) -> str:
         """使用本地库渲染 (markdown2 + weasyprint)"""
-        import base64
+        import tempfile
+        import uuid
         from weasyprint import HTML
+        
+        # 清理之前的临时文件
+        if self._temp_pdf_path and self._temp_pdf_path.exists():
+            try:
+                self._temp_pdf_path.unlink()
+            except OSError:
+                pass
         
         # 转换为 HTML
         html_body = self._markdown_to_html(markdown_content)
@@ -98,8 +107,23 @@ class MarkdownRenderer:
         # 渲染为 PDF
         pdf_bytes = HTML(string=full_html).write_pdf()
         
-        # 转换为 base64
-        return f"base64://{base64.b64encode(pdf_bytes).decode()}"
+        # 保存为临时文件（使用唯一文件名）
+        temp_dir = Path(tempfile.gettempdir()) / "astrbot_agno"
+        temp_dir.mkdir(exist_ok=True)
+        self._temp_pdf_path = temp_dir / f"render_{uuid.uuid4().hex[:8]}.pdf"
+        
+        with open(self._temp_pdf_path, "wb") as f:
+            f.write(pdf_bytes)
+        
+        return str(self._temp_pdf_path)
+
+    def cleanup(self):
+        """清理临时文件"""
+        if self._temp_pdf_path and self._temp_pdf_path.exists():
+            try:
+                self._temp_pdf_path.unlink()
+            except OSError:
+                pass
 
     def _markdown_to_html(self, markdown: str) -> str:
         """将 markdown 转换为简单 HTML"""

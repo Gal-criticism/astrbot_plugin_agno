@@ -187,4 +187,5 @@ class AgnoPlugin(Star):
             yield event.plain_result(f"连接失败: {e}")
 
     async def terminate(self):
-        pass
+        if self.renderer:
+            self.renderer.cleanup()
