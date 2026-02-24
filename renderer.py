@@ -61,7 +61,7 @@ class MarkdownRenderer:
 
     async def _render_astrbot(self, markdown_content: str, title: str) -> str:
         """使用 AstrBot html_renderer 渲染"""
-        from astrbot.api import html_renderer
+        from astrbot.api import html_renderer, logger
         
         # 读取模板
         template_path = self.template_dir / "markdown_template.html"
@@ -80,43 +80,30 @@ class MarkdownRenderer:
             template_content,
             {"content": html_content, "title": title, "font": ""},
             True,
-            {"type": "jpeg", "quality": 90}
+            {"type": "jpeg", "quality": 85}
         )
         return url
 
     async def _render_local(self, markdown_content: str, title: str) -> str:
         """使用本地库渲染 (markdown2 + weasyprint)"""
+        import io
         import base64
-        
-        try:
-            import markdown2
-        except ImportError:
-            raise ImportError("请安装 markdown2: pip install markdown2")
+        from weasyprint import HTML
         
         # 转换为 HTML
         html_body = self._markdown_to_html(markdown_content)
         
-        # 尝试使用 weasyprint 渲染为图片
-        try:
-            from weasyprint import HTML
-            import io
-            
-            # 完整 HTML 文档
-            full_html = self._wrap_html(html_body, title)
-            
-            # 渲染为 PNG
-            pdf_doc = HTML(string=full_html).render()
-            img = pdf_doc.pages[0].render()
-            
-            # 转换为 base64
-            buf = io.BytesIO()
-            img.write_to(buf, format="PNG")
-            return f"base64://{base64.b64encode(buf.getvalue()).decode()}"
-            
-        except ImportError:
-            # 如果没有 weasyprint，返回 HTML 文件
-            full_html = self._wrap_html(html_body, title)
-            return f"html://{full_html}"
+        # 完整 HTML 文档
+        full_html = self._wrap_html(html_body, title)
+        
+        # 渲染为 PNG
+        html_doc = HTML(string=full_html)
+        img = html_doc.render().pages[0]
+        
+        # 转换为 base64
+        buf = io.BytesIO()
+        img.write_to(buf, format="PNG")
+        return f"base64://{base64.b64encode(buf.getvalue()).decode()}"
 
     def _markdown_to_html(self, markdown: str) -> str:
         """将 markdown 转换为简单 HTML"""
