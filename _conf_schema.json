@@ -3,5 +3,15 @@
     "description": "AgentOS 服务地址",
     "type": "string",
     "default": "http://192.168.254.225:8001"
+  },
+  "render_mode": {
+    "description": "渲染模式: astrbot(使用渲染服务) / local(本地渲染) / plain(纯文本)",
+    "type": "string",
+    "default": "astrbot"
+  },
+  "render_threshold": {
+    "description": "超过此长度使用图片渲染(字符数)，0 表示始终使用图片",
+    "type": "integer",
+    "default": 200
   }
 }

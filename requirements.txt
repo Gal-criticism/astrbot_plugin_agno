@@ -1,3 +1,6 @@
 agno>=2.4.8
 fastapi[standard]
 httpx
+markdown2
+weasyprint
+pillow
