@@ -1,7 +1,6 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
-from .renderer import MarkdownRenderer
 
 
 @register("agno", "AGNO-AGENTOS集成", "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件", "1.0.0")
@@ -11,20 +10,11 @@ class AgnoPlugin(Star):
         self.config = config
         self.client = None
         self.base_url = None
-        self.renderer = None
 
     async def initialize(self):
         from agno.client import AgentOSClient
         import httpx
         
-        # 读取渲染配置
-        render_mode = self.config.get("render_mode", "astrbot")
-        render_threshold = self.config.get("render_threshold", 200)
-        
-        self.renderer = MarkdownRenderer(render_mode=render_mode, render_threshold=render_threshold)
-        await self.renderer.initialize()
-        logger.info(f"Markdown renderer: mode={render_mode}, threshold={render_threshold}")
-
         self.base_url = self.config.get("agentos_base_url", "http://192.168.254.193:8001")
         logger.info(f"Connecting to AgentOS: {self.base_url}")
 
@@ -83,9 +73,7 @@ class AgnoPlugin(Star):
                 msg.append("\n## Workflows\n无可用Workflows")
 
             markdown = "\n".join(msg)
-            # 使用渲染器输出图片
-            url = await self.renderer.render(markdown, title="AGNO 资源列表")
-            yield event.image_result(url)
+            yield event.plain_result(markdown)
         except Exception as e:
             logger.exception("gal_resources error")
             yield event.plain_result(f"获取失败: {e}")
@@ -106,13 +94,7 @@ class AgnoPlugin(Star):
             yield event.plain_result("🔄 正在处理...")
             result = await self.client.run_agent(agent_id="knowledge-game-agent", message=msg)
             content = result.content if result.content else "无响应"
-            
-            # 根据配置决定输出方式
-            if self.renderer.should_render(content):
-                url = await self.renderer.render(content, title="游戏 Agent 响应")
-                yield event.image_result(url)
-            else:
-                yield event.plain_result(content)
+            yield event.plain_result(content)
         except Exception as e:
             yield event.plain_result(f"执行失败: {e}")
 
@@ -132,19 +114,18 @@ class AgnoPlugin(Star):
             yield event.plain_result("🔄 正在处理...")
             result = await self.client.run_agent(agent_id="knowledge-news-agent", message=msg)
             content = result.content if result.content else "无响应"
-            
-            # 根据配置决定输出方式
-            if self.renderer.should_render(content):
-                url = await self.renderer.render(content, title="新闻 Agent 响应")
-                yield event.image_result(url)
-            else:
-                yield event.plain_result(content)
+            yield event.plain_result(content)
         except Exception as e:
             logger.exception("gal_news error")
             yield event.plain_result(f"执行失败: {e}")
 
-    @gal.command("gh")
-    async def gal_gh(self, event: AstrMessageEvent):
+    @filter.command_group("gh")
+    def gh(self):
+        """GitHub Agent 指令组"""
+        pass
+
+    @gh.command("")
+    async def gh_main(self, event: AstrMessageEvent):
         """GitHub Agent: /gh <问题>"""
         if not self.client:
             yield event.plain_result("未连接到AgentOS服务")
@@ -159,15 +140,9 @@ class AgnoPlugin(Star):
             yield event.plain_result("🔄 正在处理...")
             result = await self.client.run_agent(agent_id="github-agent", message=msg)
             content = result.content if result.content else "无响应"
-            
-            # 根据配置决定输出方式
-            if self.renderer.should_render(content):
-                url = await self.renderer.render(content, title="GitHub Agent 响应")
-                yield event.image_result(url)
-            else:
-                yield event.plain_result(content)
+            yield event.plain_result(content)
         except Exception as e:
-            logger.exception("gal_gh error")
+            logger.exception("gh_main error")
             yield event.plain_result(f"执行失败: {e}")
 
     @gal.command("test")
@@ -187,5 +162,4 @@ class AgnoPlugin(Star):
             yield event.plain_result(f"连接失败: {e}")
 
     async def terminate(self):
-        if self.renderer:
-            self.renderer.cleanup()
+        pass

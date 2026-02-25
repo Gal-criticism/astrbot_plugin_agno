@@ -1,38 +1,51 @@
 """
 Markdown 渲染器模块
-支持三种渲染方式：
-1. AstrBot html_renderer (需要 AstrBot 服务)
-2. Local (本地渲染)
-3. Plain (纯文本，不渲染)
+支持两种渲染方式：
+1. Local (本地渲染，使用 playwright)
+2. Plain (纯文本，不渲染)
 
 使用方式：
     通过配置 render_mode 参数切换：
-    - "astrbot": 使用 AstrBot 内置渲染服务
-    - "local": 使用本地 weasyprint 渲染
+    - "local": 使用本地 playwright 渲染
     - "plain": 纯文本输出
 """
 from pathlib import Path
 from typing import Optional
+import asyncio
 
 
 class MarkdownRenderer:
-    def __init__(self, render_mode: str = "astrbot", render_threshold: int = 200):
+    def __init__(self, render_mode: str = "plain", render_threshold: int = 200):
         """
         初始化渲染器
         
         Args:
-            render_mode: 渲染模式 ("astrbot", "local", "plain")
+            render_mode: 渲染模式 ("local", "plain")
             render_threshold: 超过此长度使用图片渲染，0 表示始终使用图片
         """
         self.resources_dir = Path(__file__).parent / "resources"
         self.template_dir = self.resources_dir / "template"
         self.render_mode = render_mode
         self.render_threshold = render_threshold
-        self._temp_pdf_path: Optional[Path] = None
+        self._temp_image_path: Optional[Path] = None
+        self._playwright_browser = None
+        self._playwright_context = None
 
     async def initialize(self):
         """初始化渲染器"""
-        pass
+        if self.render_mode == "local":
+            await self._init_playwright()
+
+    async def _init_playwright(self):
+        """初始化 playwright 浏览器"""
+        from playwright.async_api import async_playwright
+        
+        playwright = await async_playwright().start()
+        # 使用 webkit（缓存已有）
+        self._playwright_browser = await playwright.chromium.launch()
+        self._playwright_context = await self._playwright_browser.new_context(
+            viewport={"width": 800, "height": 600}
+        )
 
     def should_render(self, content: str) -> bool:
         """判断是否需要渲染为图片"""
@@ -44,85 +57,84 @@ class MarkdownRenderer:
 
     async def render(self, markdown_content: str, title: str = "结果") -> str:
         """
-        渲染 markdown 为图片 URL 或 base64
+        渲染 markdown 为图片
         
         Args:
             markdown_content: markdown 内容
             title: 标题
             
         Returns:
-            图片 URL 或 base64
+            base64 编码的图片或原始内容
         """
-        if self.render_mode == "astrbot":
-            return await self._render_astrbot(markdown_content, title)
-        elif self.render_mode == "local":
+        if self.render_mode == "local":
             return await self._render_local(markdown_content, title)
         else:
             return markdown_content  # plain 模式直接返回原始内容
 
-    async def _render_astrbot(self, markdown_content: str, title: str) -> str:
-        """使用 AstrBot html_renderer 渲染"""
-        from astrbot.api import html_renderer, logger
-        
-        # 读取模板
-        template_path = self.template_dir / "markdown_template.html"
-        if template_path.exists():
-            with open(template_path, "r", encoding="utf-8") as f:
-                template_content = f.read()
-        else:
-            # 使用内置模板
-            template_content = _DEFAULT_TEMPLATE
-        
-        # 将 markdown 转换为 HTML
-        html_content = self._markdown_to_html(markdown_content)
-        
-        # 渲染模板
-        url = await html_renderer.render_custom_template(
-            template_content,
-            {"content": html_content, "title": title, "font": ""},
-            True,
-            {"type": "jpeg", "quality": 85}
-        )
-        return url
-
     async def _render_local(self, markdown_content: str, title: str) -> str:
-        """使用本地库渲染 (markdown2 + weasyprint)"""
+        """使用 playwright 本地渲染"""
         import tempfile
         import uuid
-        from weasyprint import HTML
-        
+        import base64
+        import asyncio
+
+        if not self._playwright_browser:
+            await self._init_playwright()
+
         # 清理之前的临时文件
-        if self._temp_pdf_path and self._temp_pdf_path.exists():
+        if self._temp_image_path and self._temp_image_path.exists():
             try:
-                self._temp_pdf_path.unlink()
+                self._temp_image_path.unlink()
             except OSError:
                 pass
-        
+
         # 转换为 HTML
         html_body = self._markdown_to_html(markdown_content)
         
         # 完整 HTML 文档
         full_html = self._wrap_html(html_body, title)
+
+        # 创建新页面并渲染
+        page = await self._playwright_context.new_page()
+        await page.set_content(full_html, wait_until="networkidle")
         
-        # 渲染为 PDF
-        pdf_bytes = HTML(string=full_html).write_pdf()
+        # 等待内容渲染完成
+        await asyncio.sleep(0.5)
+        
+        # 截图
+        png_bytes = await page.screenshot(type="jpeg", quality=85)
+        await page.close()
         
         # 保存为临时文件（使用唯一文件名）
         temp_dir = Path(tempfile.gettempdir()) / "astrbot_agno"
         temp_dir.mkdir(exist_ok=True)
-        self._temp_pdf_path = temp_dir / f"render_{uuid.uuid4().hex[:8]}.pdf"
+        self._temp_image_path = temp_dir / f"render_{uuid.uuid4().hex[:8]}.jpg"
         
-        with open(self._temp_pdf_path, "wb") as f:
-            f.write(pdf_bytes)
+        with open(self._temp_image_path, "wb") as f:
+            f.write(png_bytes)
         
-        return str(self._temp_pdf_path)
+        # 返回 base64 编码的图片
+        base64_img = base64.b64encode(png_bytes).decode("utf-8")
+        return f"base64://{base64_img}"
 
     def cleanup(self):
-        """清理临时文件"""
-        if self._temp_pdf_path and self._temp_pdf_path.exists():
+        """清理临时文件和浏览器"""
+        if self._temp_image_path and self._temp_image_path.exists():
             try:
-                self._temp_pdf_path.unlink()
+                self._temp_image_path.unlink()
             except OSError:
+                pass
+        
+        if self._playwright_context:
+            try:
+                asyncio.create_task(self._playwright_context.close())
+            except Exception:
+                pass
+        
+        if self._playwright_browser:
+            try:
+                asyncio.create_task(self._playwright_browser.close())
+            except Exception:
                 pass
 
     def _markdown_to_html(self, markdown: str) -> str:
@@ -254,46 +266,3 @@ def get_renderer() -> MarkdownRenderer:
     if _renderer is None:
         _renderer = MarkdownRenderer()
     return _renderer
-
-
-# 默认模板（当模板文件不存在时使用）
-_DEFAULT_TEMPLATE = '''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 20px;
-        }
-        .content {
-            padding: 24px;
-            line-height: 1.7;
-        }
-        h1, h2, h3 { color: #1a1a1a; margin: 1em 0 0.5em; }
-        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px; overflow-x: auto; }
-        pre code { background: none; color: inherit; padding: 0; }
-        ul, ol { padding-left: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header"><h1>{{ title }}</h1></div>
-        <div class="content">{{ content }}</div>
-    </div>
-</body>
-</html>'''
