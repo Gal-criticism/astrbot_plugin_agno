@@ -119,12 +119,12 @@ class AgnoPlugin(Star):
             logger.exception("gal_news error")
             yield event.plain_result(f"执行失败: {e}")
 
-    @filter.command_group("gh")
-    def gh(self):
-        """GitHub Agent 指令组"""
-        pass
+    # @filter.command_group("gh")
+    # def gh(self):
+    #     """GitHub Agent 指令组"""
+    #     pass
 
-    @gh.command("")
+    @filter.command("gh")
     async def gh_main(self, event: AstrMessageEvent):
         """GitHub Agent: /gh <问题>"""
         if not self.client:
