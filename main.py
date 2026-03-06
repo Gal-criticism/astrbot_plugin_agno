@@ -138,6 +138,7 @@ class AgnoPlugin(Star):
 
         try:
             yield event.plain_result("🔄 正在处理...")
+            yield event.plain_result(msg)
             result = await self.client.run_agent(agent_id="github-agent", message=msg)
             content = result.content if result.content else "无响应"
             yield event.plain_result(content)
