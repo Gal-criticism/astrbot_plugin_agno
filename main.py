@@ -3,7 +3,12 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 
 
-@register("agno", "AGNO-AGENTOS集成", "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件", "1.0.0")
+@register(
+    "agno",
+    "AGNO-AGENTOS集成",
+    "AstrBot集成AGNO（https://docs.agno.com/），使其能否复用当前已部署AgentOS能力的插件",
+    "1.0.0",
+)
 class AgnoPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -14,14 +19,18 @@ class AgnoPlugin(Star):
     async def initialize(self):
         from agno.client import AgentOSClient
         import httpx
-        
-        self.base_url = self.config.get("agentos_base_url", "http://192.168.254.193:8001")
+
+        self.base_url = self.config.get(
+            "agentos_base_url", "http://192.168.254.193:8001"
+        )
         logger.info(f"Connecting to AgentOS: {self.base_url}")
 
         # 测试网络连接
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"{self.base_url}/health", follow_redirects=True)
+                resp = await client.get(
+                    f"{self.base_url}/health", follow_redirects=True
+                )
                 logger.info(f"AgentOS health check: {resp.status_code}")
         except Exception as e:
             logger.warning(f"AgentOS health check failed: {e}")
@@ -92,7 +101,9 @@ class AgnoPlugin(Star):
 
         try:
             yield event.plain_result("🔄 正在处理...")
-            result = await self.client.run_agent(agent_id="knowledge-game-agent", message=msg)
+            result = await self.client.run_agent(
+                agent_id="knowledge-game-agent", message=msg
+            )
             content = result.content if result.content else "无响应"
             yield event.plain_result(content)
         except Exception as e:
@@ -112,7 +123,9 @@ class AgnoPlugin(Star):
 
         try:
             yield event.plain_result("🔄 正在处理...")
-            result = await self.client.run_agent(agent_id="knowledge-news-agent", message=msg)
+            result = await self.client.run_agent(
+                agent_id="knowledge-news-agent", message=msg
+            )
             content = result.content if result.content else "无响应"
             yield event.plain_result(content)
         except Exception as e:
@@ -150,6 +163,7 @@ class AgnoPlugin(Star):
     async def gal_test(self, event: AstrMessageEvent):
         """测试AgentOS连接"""
         import httpx
+
         if not self.base_url:
             yield event.plain_result("未配置AgentOS地址")
             return
@@ -157,8 +171,12 @@ class AgnoPlugin(Star):
         try:
             yield event.plain_result(f"测试连接: {self.base_url}")
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f"{self.base_url}/health", follow_redirects=True)
-                yield event.plain_result(f"Health check: {resp.status_code}\n{resp.text}")
+                resp = await client.get(
+                    f"{self.base_url}/health", follow_redirects=True
+                )
+                yield event.plain_result(
+                    f"Health check: {resp.status_code}\n{resp.text}"
+                )
         except Exception as e:
             yield event.plain_result(f"连接失败: {e}")
 
